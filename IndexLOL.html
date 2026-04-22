@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fe-Check | Скрининг риска ЖДА</title>
+    <style>
+        :root { 
+            --primary: #2563eb; --success: #16a34a; --warning: #ca8a04; --danger: #dc2626; 
+            --bg: #f8fafc; --card: #ffffff; --text: #1e293b; --text-light: #64748b; 
+            --border: #e2e8f0;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+        body { background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        .container { background: var(--card); padding: 28px; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); max-width: 640px; width: 100%; }
+        h1 { text-align: center; margin-bottom: 6px; font-size: 1.6rem; }
+        .subtitle { text-align: center; color: var(--text-light); margin-bottom: 20px; font-size: 0.9rem; }
+        
+        .progress-bar { height: 6px; background: var(--border); border-radius: 3px; margin-bottom: 20px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--primary); width: 0%; transition: width 0.3s ease; }
+        
+        .block-header { background: #eff6ff; color: var(--primary); padding: 8px 12px; border-radius: 8px; font-weight: 600; font-size: 0.9rem; margin-bottom: 16px; display: none; }
+        .block-header.active { display: block; animation: fadeIn 0.3s; }
+        
+        .question-block { display: none; }
+        .question-block.active { display: block; animation: slideUp 0.35s; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        .q-text { font-size: 1.05rem; margin-bottom: 14px; font-weight: 500; line-height: 1.4; }
+        .options { display: flex; flex-direction: column; gap: 10px; }
+        .option-btn { padding: 14px; border: 2px solid var(--border); border-radius: 10px; background: #fff; cursor: pointer; text-align: left; transition: all 0.2s; font-size: 0.95rem; }
+        .option-btn:hover { border-color: var(--primary); background: #f8fafc; }
+        .option-btn.selected { border-color: var(--primary); background: var(--primary); color: white; }
+        
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 24px; gap: 10px; }
+        .btn { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; transition: 0.2s; flex: 1; }
+        .btn-next { background: var(--primary); color: white; }
+        .btn-next:disabled { background: #cbd5e1; cursor: not-allowed; }
+        .btn-restart { background: var(--text-light); color: white; }
+        
+        .gender-options { display: flex; gap: 12px; justify-content: center; margin: 30px 0; }
+        .btn-gender { padding: 16px 24px; font-size: 1.1rem; border: 2px solid var(--primary); background: #fff; border-radius: 12px; cursor: pointer; transition: 0.2s; font-weight: 500; flex: 1; max-width: 180px; }
+        .btn-gender:hover { background: var(--primary); color: #fff; }
+        
+        .result-block { display: none; text-align: center; }
+        .result-block.active { display: block; animation: fadeIn 0.4s; }
+        .risk-badge { padding: 8px 16px; border-radius: 20px; font-weight: bold; display: inline-block; margin: 15px 0; font-size: 1.1rem; }
+        .low { background: #dcfce7; color: var(--success); }
+        .medium { background: #fef9c3; color: var(--warning); }
+        .high { background: #fee2e2; color: var(--danger); }
+        
+        .recommendations { text-align: left; margin: 20px 0; padding: 16px; background: #f1f5f9; border-radius: 10px; }
+        .recommendations ul { padding-left: 20px; margin-top: 10px; }
+        .recommendations li { margin-bottom: 8px; line-height: 1.4; }
+        
+        .disclaimer { font-size: 0.8rem; color: var(--text-light); margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); line-height: 1.4; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🩸 Fe-Check</h1>
+        <p class="subtitle">Экспресс-скрининг риска железодефицитной анемии</p>
+
+        <!-- Экран выбора пола -->
+        <div id="start-screen">
+            <p style="text-align:center; margin: 20px 0 10px; font-size: 1.05rem;">Выберите пол для персонализации опроса:</p>
+            <div class="gender-options">
+                <button class="btn-gender" onclick="startQuiz('female')">👩 Женский</button>
+                <button class="btn-gender" onclick="startQuiz('male')">👨 Мужской</button>
+            </div>
+            <p style="text-align:center; font-size:0.85rem; color:var(--text-light); margin-top:10px;">Данные не сохраняются. Результаты носят информационный характер.</p>
+        </div>
+
+        <!-- Экран опроса -->
+        <div id="quiz-section" class="hidden">
+            <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+            <div id="block-header" class="block-header"></div>
+            <div id="questions-container"></div>
+            <div class="nav-buttons">
+                <button class="btn" id="prev-btn" style="visibility: hidden; background:#f1f5f9; color:var(--text);">← Назад</button>
+                <button class="btn btn-next" id="next-btn" disabled>Далее →</button>
+            </div>
+        </div>
+
+        <!-- Экран результата -->
+        <div id="result-section" class="result-block">
+            <h2>Ваш результат</h2>
+            <div id="risk-badge" class="risk-badge"></div>
+            <p id="score-text" style="color: var(--text-light); margin: 10px 0 20px;"></p>
+            <div class="recommendations">
+                <h3>📋 Рекомендации:</h3>
+                <ul id="rec-list"></ul>
+            </div>
+            <button class="btn btn-restart" onclick="location.reload()">🔄 Пройти заново</button>
+            <div class="disclaimer">⚠️ Данный тест не является медицинской диагностикой и не заменяет консультацию врача. Результаты основаны на скрининговых факторах риска и носят информационный характер. Для постановки диагноза и назначения лечения обратитесь к терапевту или гематологу.</div>
+        </div>
+    </div>
+
+    <script>
+        // Точный список вопросов из твоего ТЗ
+        const allQuestions = [
+            // БЛОК 1: Демография (баллы = 0, только для статистики)
+            { block: "БЛОК 1: Демография", gender: "all", text: "Ваш возраст?", options: [
+                { text: "До 18 лет", score: 0 }, { text: "18-20 лет", score: 0 }, 
+                { text: "21-23 года", score: 0 }, { text: "Старше 23 лет", score: 0 }
+            ]},
+            { block: null, gender: "all", text: "На каком вы курсе?", options: [
+                { text: "1 курс", score: 0 }, { text: "2 курс", score: 0 }, 
+                { text: "3 курс", score: 0 }, { text: "4 курс и выше", score: 0 }
+            ]},
+            
+            // БЛОК 2: Для девушек
+            { block: "БЛОК 2: Для девушек", gender: "female", text: "Характер менструаций:", options: [
+                { text: "Обычные, умеренные", score: 0 }, { text: "Обильные, длительные >5 дней, со сгустками", score: 2 }, 
+                { text: "Нерегулярные, мажущие", score: 1 }
+            ]},
+            { block: null, gender: "female", text: "Принимаете ли вы оральные контрацептивы или гормональные препараты?", options: [
+                { text: "Нет", score: 0 }, { text: "Да, принимаю постоянно", score: 1 }
+            ]},
+            { block: null, gender: "female", text: "Были ли вы беременны или в периоде лактации за последний год?", options: [
+                { text: "Нет", score: 0 }, { text: "Да", score: 2 }
+            ]},
+            
+            // БЛОК 3: Симптомы
+            { block: "БЛОК 3: Симптомы", gender: "all", text: "Как часто вы чувствуете необъяснимую усталость, слабость?", options: [
+                { text: "Никогда или редко", score: 0 }, { text: "Иногда 1-2 раза в неделю", score: 1 }, 
+                { text: "Часто 3-4 раза в неделю", score: 2 }, { text: "Постоянно", score: 2 }
+            ]},
+            { block: null, gender: "all", text: "Бывают ли головокружения при резком вставании?", options: [
+                { text: "Нет", score: 0 }, { text: "Иногда", score: 1 }, { text: "Часто", score: 2 }
+            ]},
+            { block: null, gender: "all", text: "Замечаете ли бледность кожи, ломкость ногтей, выпадение волос?", options: [
+                { text: "Нет", score: 0 }, { text: "Да, немного", score: 1 }, { text: "Да, явно", score: 2 }
+            ]},
+            { block: null, gender: "all", text: "Есть ли одышка при привычной нагрузке?", options: [
+                { text: "Нет", score: 0 }, { text: "Иногда", score: 1 }, { text: "Часто", score: 2 }
+            ]},
+            { block: null, gender: "all", text: "Бывают ли странные вкусовые пристрастия (лёд, мел, земля)?", options: [
+                { text: "Нет", score: 0 }, { text: "Да, бывает", score: 2 }
+            ]},
+            
+            // БЛОК 4: Питание
+            { block: "БЛОК 4: Питание", gender: "all", text: "Как часто употребляете красное мясо?", options: [
+                { text: "3-4 раза в неделю и чаще", score: 0 }, { text: "1-2 раза в неделю", score: 1 }, 
+                { text: "Реже 1 раза в неделю", score: 2 }, { text: "Не ем мясо", score: 2 }
+            ]},
+            { block: null, gender: "all", text: "Пьете ли чай или кофе сразу после еды?", options: [
+                { text: "Нет, жду 1-2 часа", score: 0 }, { text: "Иногда", score: 1 }, { text: "Да, сразу", score: 1 }
+            ]},
+            { block: null, gender: "all", text: "Едите ли продукты с витамином С вместе с железосодержащей едой?", options: [
+                { text: "Да, часто", score: 0 }, { text: "Иногда", score: 1 }, { text: "Нет, редко", score: 1 }
+            ]},
+            
+            // БЛОК 5: Образ жизни
+            { block: "БЛОК 5: Образ жизни", gender: "all", text: "Сколько часов спите?", options: [
+                { text: "7-9 часов", score: 0 }, { text: "5-6 часов", score: 1 }, { text: "Менее 5 часов", score: 1 }
+            ]},
+            { block: null, gender: "all", text: "Занимаетесь ли интенсивными тренировками?", options: [
+                { text: "Нет", score: 0 }, { text: "1-2 раза в неделю", score: 1 }, 
+                { text: "3 и более раз", score: 1 }, { text: "Профессиональный спорт", score: 2 }
+            ]},
+            { block: null, gender: "all", text: "Как часто испытываете стресс?", options: [
+                { text: "Редко", score: 0 }, { text: "Иногда", score: 1 }, { text: "Часто", score: 1 }, { text: "Постоянно", score: 2 }
+            ]},
+            
+            // БЛОК 6: Медицинский анамнез
+            { block: "БЛОК 6: Медицинский анамнез", gender: "all", text: "Сдавали ли анализ на гемоглобин/ферритин за последние 6 месяцев?", options: [
+                { text: "Нет", score: 1 }, { text: "Да, всё в норме", score: 0 }, { text: "Да, был дефицит", score: 3 }
+            ]},
+            { block: null, gender: "all", text: "Есть ли хронические заболевания ЖКТ?", options: [
+                { text: "Нет", score: 0 }, { text: "Да", score: 2 }
+            ]},
+            { block: null, gender: "all", text: "Принимаете ли препараты железа?", options: [
+                { text: "Нет", score: 0 }, { text: "Да, курсом", score: 1 }, { text: "Да, постоянно", score: 2 }
+            ]},
+            { block: null, gender: "all", text: "Были ли в семье случаи анемии?", options: [
+                { text: "Нет", score: 0 }, { text: "Да", score: 1 }
+            ]}
+        ];
+
+        let questions = [];
+        let currentQ = 0;
+        let answers = [];
+        let blockHeaderEl = document.getElementById('block-header');
+
+        const startScreen = document.getElementById('start-screen');
+        const quizSection = document.getElementById('quiz-section');
+        const resultSection = document.getElementById('result-section');
+        const container = document.getElementById('questions-container');
+        const progressFill = document.getElementById('progress');
+        const nextBtn = document.getElementById('next-btn');
+        const prevBtn = document.getElementById('prev-btn');
+
+        function startQuiz(gender) {
+            questions = allQuestions.filter(q => q.gender === 'all' || q.gender === gender);
+            answers = new Array(questions.length).fill(null);
+            currentQ = 0;
+            
+            startScreen.classList.add('hidden');
+            quizSection.classList.remove('hidden');
+            
+            renderQuestions();
+            updateUI();
+        }
+
+        function renderQuestions() {
+            container.innerHTML = '';
+            questions.forEach((q, i) => {
+                // Показываем заголовок блока только при первом вопросе блока
+                if (q.block && (i === 0 || questions[i-1].block !== q.block)) {
+                    const h = document.createElement('div');
+                    h.className = 'block-header';
+                    h.id = `block-h-${i}`;
+                    h.textContent = q.block;
+                    container.appendChild(h);
+                }
+
+                const div = document.createElement('div');
+                div.className = `question-block ${i === 0 ? 'active' : ''}`;
+                div.id = `q-${i}`;
+                div.innerHTML = `<p class="q-text">${q.text}</p><div class="options"></div>`;
+                
+                const optsDiv = div.querySelector('.options');
+                q.options.forEach((opt, j) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'option-btn';
+                    btn.textContent = opt.text;
+                    btn.onclick = () => selectOption(i, j, btn, optsDiv);
+                    optsDiv.appendChild(btn);
+                });
+                container.appendChild(div);
+            });
+        }
+
+        function selectOption(qIdx, optIdx, btn, optsDiv) {
+            answers[qIdx] = optIdx;
+            optsDiv.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            nextBtn.disabled = false;
+        }
+
+        function updateUI() {
+            document.querySelectorAll('.question-block').forEach((el, i) => {
+                el.classList.toggle('active', i === currentQ);
+            });
+            
+            // Управление заголовками блоков
+            document.querySelectorAll('.block-header').forEach((el, i) => {
+                el.classList.toggle('active', el.id === `block-h-${currentQ}`);
+            });
+
+            progressFill.style.width = `${((currentQ + 1) / questions.length) * 100}%`;
+            prevBtn.style.visibility = currentQ === 0 ? 'hidden' : 'visible';
+            nextBtn.textContent = currentQ === questions.length - 1 ? 'Узнать результат' : 'Далее →';
+            nextBtn.disabled = answers[currentQ] === null;
+        }
+
+        nextBtn.onclick = () => {
+            if (currentQ < questions.length - 1) {
+                currentQ++;
+                updateUI();
+            } else {
+                calculateResult();
+            }
+        };
+
+        prevBtn.onclick = () => {
+            if (currentQ > 0) {
+                currentQ--;
+                updateUI();
+            }
+        };
+
+        function calculateResult() {
+            let totalScore = 0;
+            let maxPossibleScore = 0;
+
+            answers.forEach((optIdx, qIdx) => {
+                const maxOptScore = Math.max(...questions[qIdx].options.map(o => o.score));
+                maxPossibleScore += maxOptScore;
+                if (optIdx !== null) {
+                    totalScore += questions[qIdx].options[optIdx].score;
+                }
+            });
+
+            const percent = maxPossibleScore > 0 ? (totalScore / maxPossibleScore) * 100 : 0;
+
+            quizSection.classList.add('hidden');
+            resultSection.classList.remove('hidden');
+            resultSection.classList.add('active');
+
+            let riskLevel, riskClass, recs;
+            // Пороги адаптированы под клиническую логику скрининга
+            if (percent <= 40) {
+                riskLevel = "✅ Низкий риск"; riskClass = "low";
+                recs = [
+                    "Ваши привычки и состояние не указывают на выраженный дефицит",
+                    "Продолжайте сбалансированное питание с включением красного мяса 3-4 раза в неделю",
+                    "Профилактический контроль ОАК и ферритина раз в 1-2 года"
+                ];
+            } else if (percent <= 70) {
+                riskLevel = "⚠️ Умеренный риск"; riskClass = "medium";
+                recs = [
+                    "Присутствуют факторы, способствующие снижению железа",
+                    "Скорректируйте рацион: добавляйте витамин С к растительному железу, разносите чай/кофе и приём пищи на 1-2 часа",
+                    "Сдайте ОАК и ферритин в ближайшие 1-2 месяца",
+                    "При сохранении усталости/головокружений обратитесь к терапевту"
+                ];
+            } else {
+                riskLevel = "🔴 Высокий риск"; riskClass = "high";
+                recs = [
+                    "Высокая вероятность железодефицитного состояния",
+                    "Обратитесь к врачу (терапевт/гематолог) для назначения анализов (ОАК, ферритин, сывороточное железо)",
+                    "Не начинайте приём препаратов железа самостоятельно без контроля анализов",
+                    "При подтверждении дефицита следуйте назначенной схеме и контролируйте уровень ферритина через 2-3 месяца"
+                ];
+            }
+
+            document.getElementById('risk-badge').textContent = riskLevel;
+            document.getElementById('risk-badge').className = `risk-badge ${riskClass}`;
+            document.getElementById('score-text').textContent = `Набрано ${totalScore} из ${maxPossibleScore} возможных баллов (${Math.round(percent)}%)`;
+            document.getElementById('rec-list').innerHTML = recs.map(r => `<li>${r}</li>`).join('');
+        }
+    </script>
+</body>
+</html>
